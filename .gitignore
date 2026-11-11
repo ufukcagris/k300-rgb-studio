@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+build/
+dist/
+*.spec.bak
+*.log
+Thumbs.db
+
+scripts/measure_hw_log.txt
+scripts/measure_sync_log.txt

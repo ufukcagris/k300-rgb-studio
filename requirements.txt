@@ -1,0 +1,5 @@
+PySide6>=6.6
+hidapi>=0.14
+psutil>=5.9
+numpy>=1.26
+SoundCard>=0.4.3

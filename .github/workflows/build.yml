@@ -1,0 +1,68 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+permissions:
+  contents: write   # sürüm (release) yüklemek için
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Bağımlılıkları kur
+        run: python -m pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Testler
+        run: python -m pytest -q
+        env:
+          QT_QPA_PLATFORM: offscreen
+
+      - name: Simge ve sürüm bilgisi
+        run: |
+          python scripts/make_icon.py
+          python scripts/sync_version.py
+        env:
+          QT_QPA_PLATFORM: offscreen
+
+      - name: exe derle (PyInstaller)
+        run: python -m PyInstaller --noconfirm --clean K300RGBStudio.spec
+
+      - name: exe öz-testi
+        shell: pwsh
+        run: |
+          Start-Process -Wait -FilePath dist\K300RGBStudio\K300RGBStudio.exe -ArgumentList '--selftest', 'selftest.json'
+          Get-Content selftest.json
+          $r = Get-Content selftest.json -Raw | ConvertFrom-Json
+          if (-not ($r.qt.ok -and $r.hid.ok -and $r.paket.ok)) { throw "exe öz-testi başarısız" }
+
+      - name: Inno Setup kur
+        run: choco install innosetup -y --no-progress
+
+      - name: Kurulum dosyasını üret
+        shell: pwsh
+        run: |
+          $v = (Select-String -Path k300fx\__init__.py -Pattern '__version__ = "([^"]+)"').Matches[0].Groups[1].Value
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DAppVersion=$v" installer\setup.iss
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: K300RGBStudio-Setup
+          path: dist/K300RGBStudio-Setup-*.exe
+
+      - name: Sürüm yayınla (v* etiketi)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/K300RGBStudio-Setup-*.exe
+          generate_release_notes: true
