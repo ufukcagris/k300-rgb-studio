@@ -52,6 +52,20 @@ def selftest(out: str) -> int:
     return 0 if all(v["ok"] for k, v in res.items() if k != "ses") else 1
 
 
+def gui_thread_gc():
+    """Cop toplamayi YALNIZCA arayuz is parcaciginda yap. Otomatik toplama, bellek ayiran herhangi bir
+    is parcaciginda (motor dongusu, Fn okuyucu) tetiklenebilir; orada sahipsiz kalmis bir Qt nesnesi
+    (or. dil degisiminden kalan eski pencere) silinirse Qt'nin bellegi bozulur (0xc0000374)."""
+    import gc
+
+    from PySide6.QtCore import QTimer
+    gc.disable()
+    t = QTimer(interval=2000)
+    t.timeout.connect(lambda: gc.collect())
+    t.start()
+    return t
+
+
 def main() -> int:
     if "--selftest" in sys.argv:
         i = sys.argv.index("--selftest")
@@ -79,6 +93,7 @@ def main() -> int:
         QMessageBox.information(None, tr(APP_NAME), tr("Program zaten çalışıyor (sistem tepsisine bak)."))
         return 0
 
+    gui_gc = gui_thread_gc()
     engine = Engine(FakeDevice() if "--fake" in sys.argv else K300Device(), s)
     ctl = Controller(engine, s)
     win = ctl.make()
